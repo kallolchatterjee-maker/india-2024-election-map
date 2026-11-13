@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How India voted in 2024, vote by vote</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Source+Serif+4:wght@400;600&display=swap">
+<script>
+  const savedTheme = localStorage.getItem('india-votes-theme');
+  document.documentElement.dataset.theme = savedTheme === 'light' ? 'light' : 'dark';
+</script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>How India voted for BJP in 2024, <br> vote by vote</h1>
+  <p>All 543 Lok Sabha constituencies, shown on their geographic boundaries. Scroll through the result, zoom into key states, and inspect the constituency-level data available locally.</p>
+</header>
+
+<div id="gl"><div id="labs"></div></div>
+<button id="theme-toggle" class="theme-toggle" type="button" aria-label="Use light color theme" aria-pressed="false">Light mode</button>
+<button id="motion-toggle" class="motion-toggle" type="button" aria-pressed="false">Particle motion: off</button>
+
+<!-- Fixed tooltip overlay, positioned near the pointer -->
+<div id="pc-tooltip" class="pc-tooltip" role="tooltip" aria-live="polite" style="display:none">
+  <div class="pc-tooltip-inner"></div>
+</div>
+
+<div class="legend">
+  <span class="map-result-legend"><i style="background:var(--n)"></i>BJP winner</span>
+  <span class="map-result-legend"><i style="background:var(--o)"></i>Other winner</span>
+  <span class="station-legend" id="station-legend"><i style="background:#d3d3d3;opacity:.2"></i>10,51,016 polling stations</span>
+  <span id="unit"></span>
+</div>
+
+<main id="steps"></main>
+
+<footer>
+  <p><b>Boundaries</b>: <br> DataMeet simplified 2019 parliamentary constituencies. <br> The map shows 7,84,000 sampled polling-station locations from <code>data/film.bin</code>; the ECI recorded 10,51,016 polling stations for <br> the 2024 general election. <br> Election winner records: local 2024 constituency winners CSV; national election, turnout, and polling-station coverage figures: <code>data/national.json</code>. Only a verified BJP winner is colored orange; other seats are neutral. <br> Local constituency winner data is incomplete, so the map does not infer unavailable results.</p>
+</footer>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js"
+  }
+}
+</script>
+<script src="./vendor/d3.min.js"></script>
+<script type="module" src="script.js"></script>
+</body>
+</html>

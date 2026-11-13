@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stages — Smooth Scroll × Three.js</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { height: 100%; overflow: hidden; background: #020205; }
+  body {
+    height: 100vh;
+    overflow-y: scroll;
+    background: #020205;
+    color: #fff;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    perspective: 1200px;
+  }
+  body::-webkit-scrollbar { display: none; }
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  .hud {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 48px 64px;
+    user-select: none;
+  }
+  .top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .title {
+    font-size: 13px; letter-spacing: 5px; text-transform: uppercase;
+    color: #88a; opacity: 0.65;
+  }
+  .stage {
+    font-size: 64px; font-weight: 900; line-height: 1.05;
+    margin-top: 10px; letter-spacing: -2px;
+    background: linear-gradient(135deg, #fff 60%, #00f2ff 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .progress-wrap { align-self: flex-end; text-align: right; }
+  .progress-label {
+    font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+    opacity: 0.45; margin-bottom: 8px;
+  }
+  .progress-bar {
+    width: 140px; height: 5px; background: rgba(255,255,255,0.08);
+    border-radius: 3px; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00f2ff 0%, #7000ff 60%, #ff0055 100%);
+    width: 0%;
+  }
+  .hint {
+    align-self: center;
+    font-size: 12px; letter-spacing: 4px; text-transform: uppercase;
+    opacity: 0.5; white-space: nowrap; margin-bottom: 34px;
+  }
+  .pill {
+    position: fixed; left: 50%; transform: translateX(-50%); top: 34px;
+    font-size: 12px; letter-spacing: 3px; text-transform: uppercase;
+    padding: 7px 18px; border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 999px; background: rgba(2,2,5,0.55);
+    pointer-events: none; backdrop-filter: blur(6px); opacity: 0.85;
+  }
+  .mouse-dot {
+    position: fixed; pointer-events: none; width: 14px; height: 14px;
+    border-radius: 50%; background: rgba(0, 242, 255, 0.5);
+    transform: translate(-50%, -50%); z-index: 9999; mix-blend-mode: screen;
+  }
+  @media (max-width: 768px) {
+    .hud { padding: 24px 20px; }
+    .stage { font-size: 40px; }
+    .progress-wrap { width: 110px; }
+    .pill { top: 18px; font-size: 11px; padding: 5px 14px; }
+  }
+</style>
+</head>
+<body>
+<div id="gl"></div>
+<div class="mouse-dot" id="mouseDot"></div>
+<div class="hud">
+  <div class="top">
+    <div>
+      <div class="title">scroll stages</div>
+      <div class="stage" id="stageName">stage one</div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-label">scroll depth</div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+  </div>
+  <div class="hint" id="hint">scroll to transition &bull; move mouse to distort</div>
+</div>
+<div class="pill" id="pill">stage one — origin</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+
+/* ---------- Setup ---------- */
+const canvas = document.createElement('canvas');
+document.getElementById('gl').appendChild(canvas);
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(60, 0, 0.1, 400);
+camera.position.set(0, 2, 16);
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ReinhardToneMapping;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  1.2, 0.35, 0.85
+);
+composer.addPass(bloomPass);
+
+const colorGrade = new ShaderPass({
+  uniforms: {
+    tDiffuse: { value: null },
+    progress: { value: 0 },
+    stage: { value: 0 },
+    mouse: { value: new THREE.Vector2(0, 0) },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float progress;
+    uniform float stage;
+    uniform vec2 mouse;
+    varying vec2 vUv;
+    void main() {
+      vec4 tex = texture2D(tDiffuse, vUv);
+      vec3 cyan = vec3(0.0, 0.75, 1.0);
+      vec3 magenta = vec3(1.0, 0.0, 0.55);
+      vec3 deep = vec3(0.18, 0.02, 0.45);
+      vec3 tint = mix(cyan, magenta, progress);
+      tint = mix(tint, deep, stage);
+      // subtle mouse-driven color shift
+      vec3 mouseTint = vec3(0.5 + mouse.x * 0.35, 0.5 - mouse.y * 0.25, 0.7);
+      tex.rgb *= mix(vec3(1.0), mouseTint, 0.18 * progress);
+      float vig = 1.0 - 0.9 * smoothstep(0.25, 1.0, length(vUv - 0.5) * 1.5);
+      tex.rgb *= vig;
+      tex.rgb = pow(tex.rgb, vec3(0.94));
+      gl_FragColor = tex;
+    }
+  `
+});
+composer.addPass(colorGrade);
+
+/* ---------- Lights ---------- */
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.35);
+scene.add(ambientLight);
+const pointLight = new THREE.PointLight(0xffffff, 2, 60);
+scene.add(pointLight);
+
+/* ---------- Scene objects ---------- */
+const group = new THREE.Group();
+scene.add(group);
+
+// --- Particles (25k) ---
+const particleCount = 25000;
+const pPos = new Float32Array(particleCount * 3);
+const pOrig = new Float32Array(particleCount * 3);
+for (let i = 0; i < particleCount; i++) {
+  const r = 2.5 + Math.random() * 14;
+  const theta = Math.random() * Math.PI * 2;
+  const phi = Math.acos(-1 + Math.random() * 2);
+  pOrig[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+  pOrig[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+  pOrig[i * 3 + 2] = r * Math.cos(phi);
+}
+pPos.set(pOrig);
+const pGeo = new THREE.BufferGeometry();
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+pGeo.setAttribute('orig', new THREE.BufferAttribute(pOrig, 3));
+const pCols = new Float32Array(particleCount * 3);
+for (let i = 0; i < particleCount; i++) {
+  pCols[i * 3] = 0; pCols[i * 3 + 1] = 0.85; pCols[i * 3 + 2] = 1;
+}
+pGeo.setAttribute('color', new THREE.BufferAttribute(pCols, 3));
+const pMat = new THREE.PointsMaterial({
+  size: 0.04, vertexColors: true, transparent: true,
+  opacity: 0.85, blending: THREE.AdditiveBlending, sizeAttenuation: true
+});
+const particles = new THREE.Points(pGeo, pMat);
+group.add(particles);
+
+// --- Knot (shader displaced) ---
+const knotGeo = new THREE.TorusKnotGeometry(1.7, 0.6, 220, 22);
+const knotMat = new THREE.ShaderMaterial({
+  uniforms: {
+    uTime: { value: 0 },
+    uProgress: { value: 0 },
+    uColor: { value: new THREE.Color(0x00f2ff) },
+    uDisplace: { value: 0.5 },
+    uMouse: { value: new THREE.Vector2(0, 0) },
+  },
+  vertexShader: `
+    uniform float uTime, uProgress, uDisplace;
+    uniform vec2 uMouse;
+    varying vec3 vNormal;
+    varying float vElev;
+    void main() {
+      vNormal = normal;
+      float n = sin(position.x * 4.2 + uTime + uMouse.x) * cos(position.y * 4.2 + uTime + uMouse.y) * 0.5 + 0.5;
+      n += sin(position.z * 3.2 - uTime * 0.6) * 0.5;
+      vec3 d = position + normal * (n * uDisplace * uProgress);
+      vElev = n;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(d, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform float uTime, uProgress;
+    uniform vec3 uColor;
+    varying vec3 vNormal;
+    varying float vElev;
+    void main() {
+      vec3 light = normalize(vec3(0.8, 1, 2));
+      float diff = pow(max(dot(vNormal, light), 0.0), 1.2);
+      vec3 base = mix(vec3(0.08, 0.12, 0.2), uColor, uProgress);
+      vec3 col = base * (0.25 + 0.95 * diff) + vec3(0.05, 0.1, 0.2) * vElev;
+      col += pow(diff, 40.0) * vec3(1, 1, 1) * 0.7 * uProgress;
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `,
+  flatShading: true
+});
+const knot = new THREE.Mesh(knotGeo, knotMat);
+knot.scale.set(0.01, 0.01, 0.01);
+group.add(knot);
+
+// --- Cubes (instanced) ---
+const cubeCount = 342;
+const cGeo = new THREE.BoxGeometry(0.45, 0.45, 0.45);
+const cMat = new THREE.MeshStandardMaterial({
+  color: 0x7000ff, emissive: 0x180055, emissiveIntensity: 1,
+  vertexColors: true, roughness: 0.3, metalness: 0.2
+});
+const cubes = new THREE.InstancedMesh(cGeo, cMat, cubeCount);
+const cMatrix = new THREE.Matrix4();
+const cPos = new THREE.Vector3();
+const cScl = new THREE.Vector3();
+const cQuat = new THREE.Quaternion();
+const side = Math.ceil(Math.sqrt(cubeCount));
+const cTempCol = new THREE.Color();
+cubes.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+cubes.instanceColor.setUsage(THREE.DynamicDrawUsage);
+group.add(cubes);
+
+// --- Sphere (volume) ---
+const sGeo = new THREE.IcosahedronGeometry(2.4, 3);
+const sMat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 0.4 });
+const sphere = new THREE.Mesh(sGeo, sMat);
+sphere.visible = false;
+group.add(sphere);
+
+/* ---------- Stage definitions (7 stages) ---------- */
+const STAGES = [
+  {
+    name: 'STAGE ONE — ORIGIN',
+    fog: 0.022,
+    cam: new THREE.Vector3(0, 2, 18), target: new THREE.Vector3(0, 0, 0),
+    particles: { scale: 1.4, opacity: 0.95, size: 0.05, color: new THREE.Color(0x00f2ff) },
+    knot: { visible: 0, scale: 0.01, rot: new THREE.Euler(0, 0, 0), color: new THREE.Color(0x00f2ff), displace: 0 },
+    cubes: { visible: 0, scale: 0.01, color: new THREE.Color(0x7000ff) },
+    sphere: { visible: 0 },
+    bloom: 0.8, bloomStrength: 0.4,
+  },
+  {
+    name: 'STAGE TWO — CORE',
+    fog: 0.016,
+    cam: new THREE.Vector3(6, 3, 10), target: new THREE.Vector3(0, 0.3, 0),
+    particles: { scale: 0.6, opacity: 0.35, size: 0.03, color: new THREE.Color(0x0066ff) },
+    knot: { visible: 1, scale: 1.0, rot: new THREE.Euler(0.4, 0.0, 0), color: new THREE.Color(0x00f2ff), displace: 0.6 },
+    cubes: { visible: 0.1, scale: 0.3, color: new THREE.Color(0x7000ff) },
+    sphere: { visible: 0 },
+    bloom: 1.0, bloomStrength: 0.8,
+  },
+  {
+    name: 'STAGE THREE — FLUX',
+    fog: 0.010,
+    cam: new THREE.Vector3(0, 0, 5.5), target: new THREE.Vector3(0, 0, 0),
+    particles: { scale: 0.3, opacity: 0.15, size: 0.02, color: new THREE.Color(0x7000ff) },
+    knot: { visible: 0.3, scale: 0.5, rot: new THREE.Euler(0, 1.2, 0), color: new THREE.Color(0x7000ff), displace: 0.3 },
+    cubes: { visible: 1, scale: 1.6, color: new THREE.Color(0x7000ff) },
+    sphere: { visible: 0 },
+    bloom: 1.3, bloomStrength: 1.0,
+  },
+  {
+    name: 'STAGE FOUR — VOID',
+    fog: 0.006,
+    cam: new THREE.Vector3(-12, 8, 22), target: new THREE.Vector3(0, 0, 0),
+    particles: { scale: 1.8, opacity: 0.6, size: 0.07, color: new THREE.Color(0xffffff) },
+    knot: { visible: 0, scale: 0.01, rot: new THREE.Euler(0, 0, 0), color: new THREE.Color(0xffffff), displace: 0 },
+    cubes: { visible: 0.05, scale: 0.2, color: new THREE.Color(0xffffff) },
+    sphere: { visible: 1 },
+    bloom: 1.6, bloomStrength: 1.2,
+  },
+  {
+    name: 'STAGE FIVE — PRISM',
+    fog: 0.004,
+    cam: new THREE.Vector3(4, -2, 6), target: new THREE.Vector3(0, 0, 0),
+    particles: { scale: 0.8, opacity: 0.4, size: 0.04, color: new THREE.Color(0xff00aa) },
+    knot: { visible: 0.6, scale: 0.8, rot: new THREE.Euler(1.0, 2.0, 0.5), color: new THREE.Color(0xff00aa), displace: 0.7 },
+    cubes: { visible: 0.9, scale: 1.2, color: new THREE.Color(0xff00aa) },
+    sphere: { visible: 0.5 },
+    bloom: 1.8, bloomStrength: 1.4,
+  },
+  {
+    name: 'STAGE SIX — COLLAPSE',
+    fog: 0.030,
+    cam: new THREE.Vector3(0, 0, 3), target: new THREE.Vector3(0, 0, 0),
+    particles: { scale: 0.1, opacity: 0.05, size: 0.01, color: new THREE.Color(0x110022) },
+    knot: { visible: 0.2, scale: 0.1, rot: new THREE.Euler(3, 3, 3), color: new THREE.Color(0xff0055), displace: 0.1 },
+    cubes: { visible: 0.4, scale: 0.5, color: new THREE.Color(0xff0055) },
+    sphere: { visible: 0.3 },
+    bloom: 2.2, bloomStrength: 1.8,
+  },
+  {
+    name: 'STAGE SEVEN — ZENITH',
+    fog: 0.001,
+    cam: new THREE.Vector3(0, 0, 4), target: new THREE.Vector3(0, 0, 0),
+    particles: { scale: 2.2, opacity: 0.8, size: 0.08, color: new THREE.Color(0xffffff) },
+    knot: { visible: 1, scale: 1.2, rot: new THREE.Euler(0.5, 1.5, 0), color: new THREE.Color(0xffffff), displace: 0.9 },
+    cubes: { visible: 1, scale: 2.0, color: new THREE.Color(0xffffff) },
+    sphere: { visible: 1 },
+    bloom: 2.6, bloomStrength: 2.2,
+  },
+];
+
+const STAGE_COUNT = STAGES.length;
+
+/* ---------- Scroll + mouse state ---------- */
+let scrollY = 0;
+let targetScrollY = 0;
+let maxScroll = 1;
+
+const mouse = { x: 0, y: 0, targetX: 0, targetY: 0 };
+const mouseDot = document.getElementById('mouseDot');
+
+window.addEventListener('scroll', () => { targetScrollY = window.scrollY; }, { passive: true });
+window.addEventListener('mousemove', (e) => {
+  mouse.targetX = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.targetY = (e.clientY / window.innerHeight) * 2 - 1;
+  mouseDot.style.left = e.clientX + 'px';
+  mouseDot.style.top = e.clientY + 'px';
+});
+window.addEventListener('resize', onResize);
+updateScrollRange();
+
+function updateScrollRange() {
+  document.body.style.height = `${window.innerHeight * (STAGE_COUNT + 1)}px`;
+  maxScroll = document.body.scrollHeight - window.innerHeight || 1;
+}
+
+/* ---------- Math helpers ---------- */
+function lerp(a, b, t) { return a + (b - a) * t; }
+function lerpColor(c1, c2, t, out) {
+  out.r = lerp(c1.r, c2.r, t);
+  out.g = lerp(c1.g, c2.g, t);
+  out.b = lerp(c1.b, c2.b, t);
+}
+function lerpVector(v1, v2, t, out) {
+  out.x = lerp(v1.x, v2.x, t);
+  out.y = lerp(v1.y, v2.y, t);
+  out.z = lerp(v1.z, v2.z, t);
+}
+function lerpEuler(e1, e2, t, out) {
+  out.x = lerp(e1.x, e2.x, t);
+  out.y = lerp(e1.y, e2.y, t);
+  out.z = lerp(e1.z, e2.z, t);
+}
+
+const state = {
+  camPos: new THREE.Vector3(), camTarget: new THREE.Vector3(),
+  fog: 0,
+  particles: { scale: 1, opacity: 0.5, size: 0.04, color: new THREE.Color() },
+  knot: { visible: 0, scale: 0, rot: new THREE.Euler(), color: new THREE.Color(), displace: 0 },
+  cubes: { visible: 0, scale: 0, color: new THREE.Color() },
+  sphere: { visible: 0 },
+  bloom: 1, bloomStrength: 0.6,
+  stageIndex: 0,
+};
+
+function setStateFromProgress(p) {
+  p = Math.max(0, Math.min(1, p));
+  const scaled = p * STAGE_COUNT;
+  const i = Math.min(Math.floor(scaled), STAGE_COUNT - 1);
+  const t = scaled - i;
+  const a = STAGES[i];
+  const b = STAGES[(i + 1) % STAGE_COUNT];
+
+  state.stageIndex = i;
+  lerpVector(a.cam, b.cam, t, state.camPos);
+  lerpVector(a.target, b.target, t, state.camTarget);
+  state.fog = lerp(a.fog, b.fog, t);
+
+  state.particles.scale = lerp(a.particles.scale, b.particles.scale, t);
+  state.particles.opacity = lerp(a.particles.opacity, b.particles.opacity, t);
+  state.particles.size = lerp(a.particles.size, b.particles.size, t);
+  lerpColor(a.particles.color, b.particles.color, t, state.particles.color);
+
+  state.knot.visible = lerp(a.knot.visible, b.knot.visible, t);
+  state.knot.scale = lerp(a.knot.scale, b.knot.scale, t);
+  lerpEuler(a.knot.rot, b.knot.rot, t, state.knot.rot);
+  lerpColor(a.knot.color, b.knot.color, t, state.knot.color);
+  state.knot.displace = lerp(a.knot.displace, b.knot.displace, t);
+
+  state.cubes.visible = lerp(a.cubes.visible, b.cubes.visible, t);
+  state.cubes.scale = lerp(a.cubes.scale, b.cubes.scale, t);
+  lerpColor(a.cubes.color, b.cubes.color, t, state.cubes.color);
+
+  state.sphere.visible = lerp(a.sphere.visible, b.sphere.visible, t);
+
+  state.bloom = lerp(a.bloom, b.bloom, t);
+  state.bloomStrength = lerp(a.bloomStrength, b.bloomStrength, t);
+}
+
+/* ---------- Apply state to scene ---------- */
+let time = 0;
+const tmpEuler = new THREE.Euler();
+const lookTarget = new THREE.Vector3();
+
+function applyState() {
+  time += 0.016;
+
+  // ease mouse
+  mouse.x += (mouse.targetX - mouse.x) * 0.15;
+  mouse.y += (mouse.targetY - mouse.y) * 0.15;
+
+  // --- background / fog ---
+  const bgCol = new THREE.Color().lerpColors(new THREE.Color(0x020205), state.particles.color, 0.5);
+  renderer.setClearColor(bgCol);
+  scene.fog.color.copy(bgCol);
+  scene.fog.density = state.fog;
+
+  // --- particles ---
+  particles.scale.setScalar(state.particles.scale);
+  pMat.opacity = state.particles.opacity;
+  pMat.size = state.particles.size;
+  pMat.color.copy(state.particles.color);
+  const positions = pGeo.attributes.position.array;
+  const orig = pGeo.attributes.orig.array;
+  for (let i = 0; i < particleCount; i++) {
+    const swirl = Math.sin(time * 0.4 + i * 0.01) * 0.03;
+    positions[i * 3] = orig[i * 3] + Math.cos(time * 0.3 + i * 0.01 + mouse.x * 1.5) * swirl;
+    positions[i * 3 + 1] = orig[i * 3 + 1] + Math.sin(time * 0.35 + i * 0.01 + mouse.y * 1.5) * swirl;
+    positions[i * 3 + 2] = orig[i * 3 + 2];
+  }
+  pGeo.attributes.position.needsUpdate = true;
+
+  // --- knot ---
+  knot.visible = state.knot.visible > 0.01;
+  knot.scale.setScalar(state.knot.scale);
+  knot.rotation.copy(state.knot.rot);
+  knot.rotation.y += 0.018 + mouse.x * 0.03;
+  knot.rotation.x += 0.012 + mouse.y * 0.03;
+  knotMat.uniforms.uProgress.value = state.knot.visible;
+  knotMat.uniforms.uDisplace.value = state.knot.displace;
+  knotMat.uniforms.uColor.copy(state.knot.color);
+  knotMat.uniforms.uTime.value = time;
+  knotMat.uniforms.uMouse.value.set(mouse.x, mouse.y);
+
+  // --- cubes ---
+  cubes.visible = state.cubes.visible > 0.01;
+  const cScale = state.cubes.scale;
+  const half = side * 0.5;
+  for (let i = 0; i < cubeCount; i++) {
+    const fx = (i % side) / side;
+    const fy = Math.floor(i / side) / side;
+    cPos.set((fx - 0.5) * 12, (fy - 0.5) * 12, (Math.sin(i) * 4 - 2));
+    cScl.setScalar(cScale * (0.5 + 0.5 * Math.sin(time * 1.2 + i * 0.1)));
+    cQuat.setFromEuler(tmpEuler.set(
+      time * 0.4 + i * 0.03 + mouse.y * 0.6,
+      time * 0.25 + i * 0.02 + mouse.x * 0.6,
+      0
+    ));
+    cMatrix.compose(cPos, cQuat, cScl);
+    cubes.setMatrixAt(i, cMatrix);
+    cTempCol.copy(state.cubes.color);
+    cubes.setColorAt(i, cTempCol);
+  }
+  cubes.instanceMatrix.needsUpdate = true;
+  cubes.instanceColor.needsUpdate = true;
+
+  // --- sphere ---
+  sphere.visible = state.sphere.visible > 0.01;
+  if (sphere.visible) {
+    sphere.scale.setScalar(lerp(0.01, 1, state.sphere.visible));
+    sphere.rotation.y = time * 0.15 + mouse.x * 0.2;
+    sphere.rotation.x = time * 0.1 + mouse.y * 0.2;
+    const vs = sGeo.attributes.position.array;
+    for (let i = 0; i < vs.length; i += 3) {
+      const n = 0.12 * Math.sin(vs[i] * 1.8 + time * 1.5 + mouse.x) * Math.cos(vs[i + 1] * 1.8 + time + mouse.y);
+      vs[i] *= (1 + n); vs[i + 1] *= (1 + n); vs[i + 2] *= (1 + n);
+    }
+    sGeo.attributes.position.needsUpdate = true;
+    sGeo.computeVertexNormals();
+  }
+
+  // --- lights (mouse-reactive) ---
+  pointLight.position.set(mouse.x * 14, mouse.y * 10, 14);
+  pointLight.color.copy(state.particles.color);
+  pointLight.intensity = 1 + state.bloomStrength * 0.5;
+
+  // --- camera ---
+  camera.position.lerp(state.camPos, 0.18);
+  lookTarget.copy(state.camTarget);
+  lookTarget.x += mouse.x * 2.5;
+  lookTarget.y += mouse.y * 1.5;
+  camera.lookAt(lookTarget);
+
+  // --- post processing ---
+  renderer.toneMappingExposure = state.bloom;
+  bloomPass.strength = state.bloomStrength;
+  colorGrade.uniforms.progress.value = scrollY / maxScroll;
+  colorGrade.uniforms.stage.value = state.stageIndex / Math.max(STAGE_COUNT - 1, 1);
+  colorGrade.uniforms.mouse.value.set(mouse.x, mouse.y);
+}
+
+/* ---------- UI ---------- */
+const stageNameEl = document.getElementById('stageName');
+const pillEl = document.getElementById('pill');
+const fillEl = document.getElementById('progressFill');
+const hintEl = document.getElementById('hint');
+
+function updateUI(p) {
+  const idx = state.stageIndex;
+  const name = STAGES[idx].name;
+  stageNameEl.textContent = name;
+  pillEl.textContent = name;
+  fillEl.style.width = `${(p * 100).toFixed(1)}%`;
+  if (p > 0.02) hintEl.style.opacity = '0';
+}
+
+/* ---------- Render loop ---------- */
+function onResize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  composer.setSize(w, h);
+  bloomPass.resolution.set(w, h);
+  updateScrollRange();
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  scrollY += (targetScrollY - scrollY) * 0.14;
+  const p = scrollY / maxScroll;
+
+  setStateFromProgress(p);
+  applyState();
+  updateUI(p);
+
+  composer.render();
+}
+
+animate();
+setStateFromProgress(0);
+applyState();
+composer.render();
+</script>
+</body>
+</html>

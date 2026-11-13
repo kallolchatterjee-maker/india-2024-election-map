@@ -1,0 +1,23 @@
+{
+  "name": "india-votes-3d",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Three.js based 3D visualization of India's 2024 Lok Sabha election results, seat by seat",
+  "main": "index.html",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "http": "http-server -c-1 -o -p 8080",
+    "postinstall": "npm run start"
+  },
+  "dependencies": {
+    "d3": "^7.9.1",
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

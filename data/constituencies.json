@@ -1,0 +1,97 @@
+{
+  "source": "indiavotes.com / Election Commission of India (placeholder draft)",
+  "status": "PLACEHOLDER — verify every figure against indiavotes.com before publishing",
+  "methodology": {
+    "join": "2019 and 2024 joined by constituency ID",
+    "allianceRetrofit": "Shifts computed using 2024 alliance structure applied retroactively to 2019 votes",
+    "delimitationExceptions": ["Assam (delimited 2023)", "Jammu & Kashmir (delimited 2022)"],
+    "surat": "Unopposed — no shift arrow, no margin",
+    "nota": "Shown prominently where applicable (e.g. Indore)"
+  },
+  "fields": [
+    "id", "name", "state", "winner", "party", "alliance",
+    "votes", "runnerUp", "margin", "turnout", "NOTA", "totalElectors",
+    "margin2019", "votes2019", "x", "z", "delimited", "unopposed"
+  ],
+  "seats": [
+    {
+      "id": "varanasi", "name": "Varanasi", "state": "Uttar Pradesh",
+      "winner": "Modi", "party": "BJP", "alliance": "NDA",
+      "votes": 612900, "runnerUp": "Unknown", "margin": 152000,
+      "turnout": 56.3, "NOTA": 4200, "totalElectors": 1800000,
+      "margin2019": 478000, "votes2019": 675000,
+      "x": 83.0, "z": 25.3, "delimited": false, "unopposed": false
+    },
+    {
+      "id": "indore", "name": "Indore", "state": "Madhya Pradesh",
+      "winner": "Unknown", "party": "BJP", "alliance": "NDA",
+      "votes": 1100000, "runnerUp": "NOTA", "margin": 1000000,
+      "turnout": 68.0, "NOTA": 218000, "totalElectors": 2200000,
+      "margin2019": 500000, "votes2019": 900000,
+      "x": 75.8, "z": 22.7, "delimited": false, "unopposed": false
+    },
+    {
+      "id": "mumbai-nw", "name": "Mumbai North West", "state": "Maharashtra",
+      "winner": "Unknown", "party": "INDIA bloc", "alliance": "INDIA bloc",
+      "votes": 450000, "runnerUp": "Unknown", "margin": 48,
+      "turnout": 52.0, "NOTA": 5000, "totalElectors": 1800000,
+      "margin2019": -120000, "votes2019": 380000,
+      "x": 72.8, "z": 19.1, "delimited": false, "unopposed": false
+    },
+    {
+      "id": "surat", "name": "Surat", "state": "Gujarat",
+      "winner": "Unknown", "party": "BJP", "alliance": "NDA",
+      "votes": 0, "runnerUp": "Unopposed", "margin": null,
+      "turnout": null, "NOTA": 0, "totalElectors": 0,
+      "margin2019": null, "votes2019": null,
+      "x": 72.9, "z": 21.2, "delimited": false, "unopposed": true
+    },
+    {
+      "id": "amethi", "name": "Amethi", "state": "Uttar Pradesh",
+      "winner": "Unknown", "party": "INC", "alliance": "INDIA bloc",
+      "votes": 400000, "runnerUp": "Unknown", "margin": 150000,
+      "turnout": 58.0, "NOTA": 3000, "totalElectors": 1600000,
+      "margin2019": -90000, "votes2019": 310000,
+      "x": 81.8, "z": 26.2, "delimited": false, "unopposed": false
+    },
+    {
+      "id": "rae-bareli", "name": "Rae Bareli", "state": "Uttar Pradesh",
+      "winner": "Unknown", "party": "INC", "alliance": "INDIA bloc",
+      "votes": 520000, "runnerUp": "Unknown", "margin": 170000,
+      "turnout": 60.0, "NOTA": 3500, "totalElectors": 1700000,
+      "margin2019": -110000, "votes2019": 410000,
+      "x": 81.2, "z": 26.2, "delimited": false, "unopposed": false
+    },
+    {
+      "id": "bhopal", "name": "Bhopal", "state": "Madhya Pradesh",
+      "winner": "Unknown", "party": "BJP", "alliance": "NDA",
+      "votes": 750000, "runnerUp": "Unknown", "margin": 320000,
+      "turnout": 64.0, "NOTA": 6000, "totalElectors": 1900000,
+      "margin2019": 250000, "votes2019": 600000,
+      "x": 77.4, "z": 23.2, "delimited": false, "unopposed": false
+    },
+    {
+      "id": "patna-sahib", "name": "Patna Sahib", "state": "Bihar",
+      "winner": "Unknown", "party": "BJP", "alliance": "NDA",
+      "votes": 520000, "runnerUp": "Unknown", "margin": 90000,
+      "turnout": 55.0, "NOTA": 4000, "totalElectors": 1500000,
+      "margin2019": 180000, "votes2019": 480000,
+      "x": 85.1, "z": 25.6, "delimited": false, "unopposed": false
+    },
+    {
+      "id": "thrissur", "name": "Thrissur", "state": "Kerala",
+      "winner": "Unknown", "party": "BJP", "alliance": "NDA",
+      "votes": 320000, "runnerUp": "Unknown", "margin": 45000,
+      "turnout": 72.0, "NOTA": 2000, "totalElectors": 1200000,
+      "margin2019": -80000, "votes2019": 0,
+      "x": 76.2, "z": 10.5, "delimited": false, "unopposed": false
+    }
+  ],
+  "gaps": [
+    "Full 543-seat dataset not yet loaded — placeholder has 9 constituencies only",
+    "Real constituency boundary polygons (simplified) not yet integrated",
+    "2019 alliance retrofitting table not yet built",
+    "Turnout and NOTA figures are illustrative",
+    "Hindi translations not yet applied"
+  ]
+}
