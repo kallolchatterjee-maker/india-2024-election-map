@@ -7,7 +7,7 @@ Scrollytelling web experience on India's 2024 general election, modelled on The 
 ## Project structure
 
 ```
-Index.html           # Main scrollytelling page
+index.html           # Main scrollytelling page
 How India voted in 2024, vote by vote.html  # SVG map and accessible seat details
 style.css            # Main page styles and theme palettes
 script.js            # Three.js boundary map, CSV binding, camera and story chapters
@@ -19,6 +19,7 @@ data/GE2024.json   # Constituency winners, runners-up, and available margins
 data/national.json # National, state-turnout, and polling-station coverage statistics
 data/film.bin      # 24,000 sampled polling-station coordinates used by the map and particle sequence
 data/constituencies.json   # Older placeholder sample; not used by the current map pages
+vendor/              # Pinned Three.js and D3 builds used by the static pages
 README.md            # This file
 ```
 
@@ -47,7 +48,18 @@ npm install
 npm run dev
 ```
 
-Then open `http://localhost:8080/Index.html`.
+Then open `http://localhost:8080/`.
+
+## Deploying to GitHub Pages
+
+The site is fully static. `vendor/three.module.js` and `vendor/d3.min.js` are committed so Pages does not need `npm install`, and all asset URLs are relative so the site works from a project URL such as `https://<user>.github.io/<repo>/`.
+
+1. Push `main` to a GitHub repository.
+2. In the repository, open **Settings → Pages**.
+3. Set **Source** to *Deploy from a branch*, branch `main`, folder `/ (root)`, then save.
+4. The site publishes at `https://<user>.github.io/<repo>/`.
+
+The `.nojekyll` file stops Jekyll from processing the data files. Pages on a private repository requires GitHub Pro, Team, or Enterprise; the published site is still publicly readable.
 
 ## Data pipeline (to build before publishing)
 
