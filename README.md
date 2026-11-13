@@ -59,6 +59,8 @@ The site is fully static. `vendor/three.module.js` and `vendor/d3.min.js` are co
 3. Set **Source** to *Deploy from a branch*, branch `main`, folder `/ (root)`, then save.
 4. The site publishes at `https://<user>.github.io/<repo>/`.
 
+This project is live at **https://kallolchatterjee-maker.github.io/india-2024-election-map/**.
+
 The `.nojekyll` file stops Jekyll from processing the data files. Pages on a private repository requires GitHub Pro, Team, or Enterprise; the published site is still publicly readable.
 
 ## Data pipeline (to build before publishing)
